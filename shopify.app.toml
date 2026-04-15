@@ -1,6 +1,6 @@
 client_id = "276eebefa8668fd34d829854ade20e31"
 name = "COGS Margin Tracker"
-application_url = "https://shopify-cogs-margin-tracker-production.up.railway.app"
+application_url = "https://cogs.leverageapps.co"
 embedded = true
 
 [build]
@@ -18,10 +18,10 @@ scopes = "read_products,write_products,read_orders,read_inventory,write_inventor
   trial_days = 7
 
 [auth]
-redirect_urls = [ "https://shopify-cogs-margin-tracker-production.up.railway.app/auth/callback" ]
+redirect_urls = [ "https://cogs.leverageapps.co/auth/callback" ]
 
 [webhooks]
-api_version = "2025-01"
+api_version = "2026-04"
 
   [[webhooks.subscriptions]]
   uri = "/webhooks/app/uninstalled"
