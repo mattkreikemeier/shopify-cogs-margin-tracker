@@ -1,0 +1,82 @@
+.index {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 2rem;
+  background: #0C1220;
+  color: #f0f4ff;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.content {
+  max-width: 540px;
+  text-align: center;
+}
+
+.heading {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+  letter-spacing: -0.03em;
+}
+
+.accent {
+  color: #a78bfa;
+}
+
+.text {
+  font-size: 1rem;
+  color: #8a9bc4;
+  margin-bottom: 1.5rem;
+  line-height: 1.7;
+}
+
+.list {
+  text-align: left;
+  color: #8a9bc4;
+  margin: 0 auto 2rem;
+  max-width: 360px;
+  line-height: 2;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  color: #8a9bc4;
+  text-align: left;
+}
+
+.input {
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: #1a2540;
+  color: #f0f4ff;
+  font-size: 1rem;
+}
+
+.button {
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: none;
+  background: #a78bfa;
+  color: #1a0a2e;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.button:hover {
+  opacity: 0.9;
+}
