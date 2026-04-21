@@ -59,9 +59,16 @@ function MarginBadge({
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const shop = session.shop;
   const url = new URL(request.url);
+
+  // Auto-sync costs from Shopify on every page load
+  try {
+    await syncAllProductCosts(admin, shop);
+  } catch (e) {
+    console.error("Auto-sync failed:", e);
+  }
 
   const search = url.searchParams.get("search") || "";
   const marginFilter = url.searchParams.get("margin") || "all";
