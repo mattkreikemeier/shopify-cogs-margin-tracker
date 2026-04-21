@@ -1,26 +1,20 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
-import { redirect } from "@remix-run/node";
 import { Link, Outlet, useLoaderData, useRouteError } from "@remix-run/react";
 import { boundary } from "@shopify/shopify-app-remix/server";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
 import { NavMenu } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
-import { authenticate } from "../shopify.server";
-import { checkSubscription } from "../services/billing.server";
+import { authenticate, PLAN_NAME } from "../shopify.server";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
+  const { billing } = await authenticate.admin(request);
 
-  // Skip billing check for the billing page to avoid redirect loop
-  const url = new URL(request.url);
-  if (!url.pathname.endsWith("/billing")) {
-    const hasSubscription = await checkSubscription(admin);
-    if (!hasSubscription) {
-      throw redirect("/app/billing");
-    }
+  const { hasActivePayment } = await billing.check({ plans: [PLAN_NAME] });
+  if (!hasActivePayment) {
+    await billing.request({ plan: PLAN_NAME });
   }
 
   return { apiKey: process.env.SHOPIFY_API_KEY || "" };
