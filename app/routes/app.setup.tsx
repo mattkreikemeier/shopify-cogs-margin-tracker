@@ -135,7 +135,6 @@ export default function Setup() {
   const orderFetcher = useFetcher();
   const feeFetcher = useFetcher();
   const alertFetcher = useFetcher();
-
   const [daysBack, setDaysBack] = useState("60");
   const [feeRate, setFeeRate] = useState(
     settings?.paymentFeeRate?.toString() || "2.9",

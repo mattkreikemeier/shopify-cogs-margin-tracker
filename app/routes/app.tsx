@@ -12,9 +12,20 @@ export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { billing } = await authenticate.admin(request);
 
-  const { hasActivePayment } = await billing.check({ plans: [PLAN_NAME] });
-  if (!hasActivePayment) {
-    await billing.request({ plan: PLAN_NAME });
+  try {
+    const { hasActivePayment } = await billing.check({ plans: [PLAN_NAME] });
+    if (!hasActivePayment) {
+      // isTest defaults to true in the library; production must create real charges
+      await billing.request({
+        plan: PLAN_NAME,
+        isTest: process.env.NODE_ENV !== "production",
+      });
+    }
+  } catch (error) {
+    // billing.request throws a Response redirect to Shopify's charge approval page
+    // — rethrow those. Only swallow actual errors (e.g. dev store quirks).
+    if (error instanceof Response) throw error;
+    console.error("Billing error (non-fatal):", error);
   }
 
   return { apiKey: process.env.SHOPIFY_API_KEY || "" };

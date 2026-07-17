@@ -1,27 +1,12 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
 client_id = "276eebefa8668fd34d829854ade20e31"
-name = "COGS Margin Tracker"
+name = "CoGS Margin Tracker"
 application_url = "https://cogs.leverageapps.co"
 embedded = true
 
-[build]
-automatically_update_urls_on_dev = true
-include_config_on_deploy = true
-
-[access_scopes]
-scopes = "read_products,write_products,read_orders,read_inventory,write_inventory"
-
-[billing]
-  [billing.cogs_tracker_plan]
-  amount = 9.99
-  currency_code = "USD"
-  interval = "EVERY_30_DAYS"
-  trial_days = 7
-
-[auth]
-redirect_urls = [ "https://cogs.leverageapps.co/auth/callback" ]
-
 [webhooks]
-api_version = "2026-04"
+api_version = "2026-07"
 
   [[webhooks.subscriptions]]
   uri = "/webhooks/app/uninstalled"
@@ -54,3 +39,13 @@ api_version = "2026-04"
   [[webhooks.subscriptions]]
   uri = "/webhooks/shop/redact"
   compliance_topics = ["shop/redact"]
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_inventory,read_orders,read_products,write_inventory,write_products"
+
+[auth]
+redirect_urls = [ "https://cogs.leverageapps.co/auth/callback" ]
+
+[build]
+automatically_update_urls_on_dev = true
