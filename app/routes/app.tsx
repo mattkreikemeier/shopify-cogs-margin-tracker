@@ -15,10 +15,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const { hasActivePayment } = await billing.check({ plans: [PLAN_NAME] });
     if (!hasActivePayment) {
-      // isTest defaults to true in the library; production must create real charges
+      // isTest defaults to true in the library; production must create real charges.
+      // BILLING_TEST=1 forces test charges in production, for verifying the
+      // billing flow on a dev store without a payment method on file
       await billing.request({
         plan: PLAN_NAME,
-        isTest: process.env.NODE_ENV !== "production",
+        isTest:
+          process.env.BILLING_TEST === "1" ||
+          process.env.NODE_ENV !== "production",
       });
     }
   } catch (error) {
