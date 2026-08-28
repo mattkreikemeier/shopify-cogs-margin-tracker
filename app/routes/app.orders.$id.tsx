@@ -19,7 +19,10 @@ import { TitleBar } from "@shopify/app-bridge-react";
 
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
-import { getShopSettings } from "../services/margin-calculator.server";
+import {
+  getDashboardMetrics,
+  getShopSettings,
+} from "../services/margin-calculator.server";
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -61,6 +64,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       orderName: null,
       orderDate: null,
       adminOrderId: null,
+      storeContext: null,
       lineItems: [],
       totals: null,
     });
@@ -107,6 +111,60 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     : null;
   const netProfit = fees !== null ? grossProfit - fees : null;
 
+  // "vs. your store" context: revenue-weighted margin over the store's last
+  // 30 days, same math as the dashboard's average margin
+  type MarginDrag =
+    | { type: "discount"; codes: string[]; amount: number }
+    | { type: "item"; title: string; marginPct: number };
+  let storeContext: {
+    deltaPts: number;
+    avgMarginPct: number;
+    drag: MarginDrag | null;
+  } | null = null;
+  if (marginPct !== null) {
+    const baselineEnd = new Date();
+    const baselineStart = new Date();
+    baselineStart.setDate(baselineEnd.getDate() - 30);
+    const baseline = await getDashboardMetrics(
+      shop,
+      baselineStart,
+      baselineEnd,
+    );
+    if (baseline.totalRevenue > 0) {
+      const deltaPts = marginPct - baseline.avgMarginPct;
+      let drag: MarginDrag | null = null;
+      if (deltaPts < -1) {
+        // Biggest drag in dollars: the discount total, or the line item
+        // costing the most profit relative to the store average
+        let worstItemDrag = 0;
+        let worstItem: { title: string; marginPct: number } | null = null;
+        for (const li of lineItems) {
+          if (li.marginPct === null) continue;
+          const itemDrag =
+            ((baseline.avgMarginPct - Number(li.marginPct)) / 100) *
+            Number(li.revenue);
+          if (itemDrag > worstItemDrag) {
+            worstItemDrag = itemDrag;
+            worstItem = {
+              title: li.productTitle,
+              marginPct: Number(li.marginPct),
+            };
+          }
+        }
+        if (discountTotal > 0 && discountTotal >= worstItemDrag) {
+          drag = {
+            type: "discount",
+            codes: Array.from(codes),
+            amount: discountTotal,
+          };
+        } else if (worstItem) {
+          drag = { type: "item", ...worstItem };
+        }
+      }
+      storeContext = { deltaPts, avgMarginPct: baseline.avgMarginPct, drag };
+    }
+  }
+
   // Seeded/historical rows can carry non-numeric ids; only real Shopify
   // orders get an admin link
   const adminOrderId = /^\d+$/.test(params.id || "") ? params.id : null;
@@ -116,6 +174,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     orderName: lineItems[0].orderName,
     orderDate: lineItems[0].orderDate.toISOString(),
     adminOrderId,
+    storeContext,
     lineItems: lineItems.map((li) => ({
       id: li.id,
       productTitle: li.productTitle,
@@ -203,8 +262,42 @@ export default function OrderDetail() {
     );
   }
 
-  const { orderName, orderDate, adminOrderId, lineItems, totals } = data;
+  const { orderName, orderDate, adminOrderId, storeContext, lineItems, totals } =
+    data;
   const t = totals!;
+
+  let contextLine: { badge: string; tone: "success" | "critical" | "info"; text: string } | null =
+    null;
+  if (storeContext) {
+    const delta = storeContext.deltaPts;
+    const avg = `${storeContext.avgMarginPct.toFixed(1)}%`;
+    if (Math.abs(delta) <= 1) {
+      contextLine = {
+        badge: "On par",
+        tone: "info",
+        text: `This order's margin is in line with your store's 30-day average (${avg}).`,
+      };
+    } else if (delta > 0) {
+      contextLine = {
+        badge: `+${delta.toFixed(1)} pts`,
+        tone: "success",
+        text: `This order's margin is ${delta.toFixed(1)} points above your store's 30-day average (${avg}).`,
+      };
+    } else {
+      let dragText = "";
+      if (storeContext.drag?.type === "discount") {
+        const codeList = storeContext.drag.codes.join(", ");
+        dragText = ` Main drag: the ${codeList || "order"} discount (${formatMoney(storeContext.drag.amount)} off).`;
+      } else if (storeContext.drag?.type === "item") {
+        dragText = ` Main drag: ${storeContext.drag.title} (${storeContext.drag.marginPct.toFixed(1)}% margin).`;
+      }
+      contextLine = {
+        badge: `${delta.toFixed(1)} pts`,
+        tone: "critical",
+        text: `This order's margin is ${Math.abs(delta).toFixed(1)} points below your store's 30-day average (${avg}).${dragText}`,
+      };
+    }
+  }
 
   return (
     <Page
@@ -283,6 +376,21 @@ export default function OrderDetail() {
             />
           )}
         </InlineGrid>
+
+        {contextLine && (
+          <Card>
+            <InlineStack gap="300" blockAlign="center" wrap={false}>
+              <Badge
+                tone={
+                  contextLine.tone === "info" ? undefined : contextLine.tone
+                }
+              >
+                {contextLine.badge}
+              </Badge>
+              <Text as="p">{contextLine.text}</Text>
+            </InlineStack>
+          </Card>
+        )}
 
         {t.discountTotal > 0 && (
           <Card>
