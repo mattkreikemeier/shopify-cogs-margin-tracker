@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData, useSearchParams } from "@remix-run/react";
+import { useLoaderData, useNavigate, useSearchParams } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -76,6 +76,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return json({
     lineItems: lineItems.map((li) => ({
       id: li.id,
+      orderKey: li.orderId.replace("gid://shopify/Order/", ""),
       orderName: li.orderName,
       orderDate: li.orderDate.toISOString(),
       productTitle: li.productTitle,
@@ -99,6 +100,7 @@ export default function Orders() {
   const { lineItems, total, page, totalPages, range } =
     useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const handleRangeChange = useCallback(
     (newRange: string) => {
@@ -181,7 +183,12 @@ export default function Orders() {
                     selectable={false}
                   >
                     {lineItems.map((li, index) => (
-                      <IndexTable.Row id={li.id} key={li.id} position={index}>
+                      <IndexTable.Row
+                        id={li.id}
+                        key={li.id}
+                        position={index}
+                        onClick={() => navigate(`/app/orders/${li.orderKey}`)}
+                      >
                         <IndexTable.Cell>
                           <Text
                             variant="bodyMd"
