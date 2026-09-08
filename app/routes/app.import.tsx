@@ -166,6 +166,40 @@ export default function ImportCosts() {
     setParseError(null);
   }, []);
 
+  // Downloads must go through fetch + blob: link navigation inside the
+  // embedded iframe hands the CSV response to the SPA router, which
+  // renders a blank page. App Bridge attaches the session token to
+  // same-origin fetches, so the resource routes authenticate normally.
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const handleDownload = useCallback(
+    async (path: string, fallbackName: string) => {
+      setDownloading(path);
+      setDownloadError(null);
+      try {
+        const res = await fetch(path);
+        if (!res.ok) throw new Error(`Request failed (${res.status})`);
+        const blob = await res.blob();
+        const disposition = res.headers.get("Content-Disposition") || "";
+        const match = disposition.match(/filename="([^"]+)"/);
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = match ? match[1] : fallbackName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(link.href);
+      } catch {
+        setDownloadError(
+          "The download could not be prepared. Please try again.",
+        );
+      } finally {
+        setDownloading(null);
+      }
+    },
+    [],
+  );
+
   return (
     <Page>
       <TitleBar title="Import Costs" />
@@ -204,11 +238,30 @@ export default function ImportCosts() {
                   <strong>cost</strong> columns to update product costs in bulk.
                   You have {variantCount} synced variants.
                 </Text>
+                {downloadError && (
+                  <Banner title="Download failed" tone="critical">
+                    <p>{downloadError}</p>
+                  </Banner>
+                )}
                 <InlineStack gap="300">
-                  <Button url="/app/costs-template" variant="primary">
+                  <Button
+                    variant="primary"
+                    loading={downloading === "/app/costs-template"}
+                    onClick={() =>
+                      handleDownload(
+                        "/app/costs-template",
+                        "cost-import-template.csv",
+                      )
+                    }
+                  >
                     Download import template
                   </Button>
-                  <Button url="/app/costs-export">
+                  <Button
+                    loading={downloading === "/app/costs-export"}
+                    onClick={() =>
+                      handleDownload("/app/costs-export", "product-costs.csv")
+                    }
+                  >
                     Download current costs (CSV)
                   </Button>
                 </InlineStack>
