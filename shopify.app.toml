@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "276eebefa8668fd34d829854ade20e31"
-name = "Leverage: COGS Margin Tracker"
+name = "Leverage: Profit Analytics"
 application_url = "https://cogs.leverageapps.co"
 embedded = true
 
