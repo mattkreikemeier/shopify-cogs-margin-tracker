@@ -21,6 +21,7 @@ import { TitleBar } from "@shopify/app-bridge-react";
 import { useState, useCallback } from "react";
 
 import { authenticate } from "../shopify.server";
+import { requirePro } from "../services/billing.server";
 import {
   getExpenses,
   createExpense,
@@ -46,7 +47,8 @@ function normalizeToMonthly(amount: number, frequency: string): number {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
+  await requirePro(admin, "expenses");
   const shop = session.shop;
   const expenses = await getExpenses(shop);
 
@@ -70,7 +72,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
+  await requirePro(admin, "expenses");
   const shop = session.shop;
   const formData = await request.formData();
   const intent = formData.get("intent");

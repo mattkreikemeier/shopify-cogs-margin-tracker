@@ -18,6 +18,7 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 
 import { authenticate } from "../shopify.server";
+import { requirePro } from "../services/billing.server";
 import { getDiscountAnalysis } from "../services/discount-analytics.server";
 
 function formatMoney(amount: number): string {
@@ -28,7 +29,8 @@ function formatMoney(amount: number): string {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
+  await requirePro(admin, "discounts");
   const shop = session.shop;
   const url = new URL(request.url);
   const range = url.searchParams.get("range") || "30d";

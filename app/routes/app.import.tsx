@@ -19,6 +19,7 @@ import { TitleBar } from "@shopify/app-bridge-react";
 import { useState, useCallback } from "react";
 
 import { authenticate } from "../shopify.server";
+import { requirePro } from "../services/billing.server";
 import db from "../db.server";
 import { updateVariantCost } from "../services/cost-writer.server";
 
@@ -28,7 +29,8 @@ interface CsvRow {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
+  await requirePro(admin, "import");
   const shop = session.shop;
   const variantCount = await db.productCost.count({ where: { shop } });
   return json({ variantCount });
@@ -36,6 +38,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
+  await requirePro(admin, "import");
   const shop = session.shop;
   const formData = await request.formData();
   const intent = formData.get("intent");

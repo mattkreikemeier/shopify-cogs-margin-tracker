@@ -3,6 +3,7 @@ import { json } from "@remix-run/node";
 import {
   useLoaderData,
   useSearchParams,
+  useNavigate,
   Link,
   useFetcher,
 } from "@remix-run/react";
@@ -27,6 +28,8 @@ import { TitleBar } from "@shopify/app-bridge-react";
 import { useState, useEffect } from "react";
 
 import { authenticate } from "../shopify.server";
+import { checkSubscription } from "../services/billing.server";
+import { allowedRange, FREE_TIER } from "../lib/plans";
 import db from "../db.server";
 import {
   getDashboardMetrics,
@@ -51,10 +54,15 @@ function formatMoney(amount: number): string {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
   const shop = session.shop;
+  const isPaid = await checkSubscription(admin);
   const url = new URL(request.url);
-  const range = url.searchParams.get("range") || "30d";
+  const requestedRange = url.searchParams.get("range") || "30d";
+  // Free plan silently falls back instead of erroring, so a bookmarked 90d
+  // link after a downgrade still renders.
+  const range = allowedRange(requestedRange, isPaid);
+  const rangeClamped = range !== requestedRange;
 
   const productCount = await db.productCost.count({ where: { shop } });
 
@@ -64,6 +72,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       productCount: 0,
       range,
       shop,
+      isPaid,
+      rangeClamped,
     });
   }
 
@@ -101,12 +111,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   // Expense allocation (optional)
   const periodDays = range === "7d" ? 7 : range === "90d" ? 90 : 30;
-  const expenseData = await getExpenseSummary(
-    shop,
-    metrics.grossProfit,
-    metrics.totalRevenue,
-    periodDays,
-  );
+  const expenseData = isPaid
+    ? await getExpenseSummary(
+        shop,
+        metrics.grossProfit,
+        metrics.totalRevenue,
+        periodDays,
+      )
+    : null;
 
   // Generate insights
   const insights = generateInsights({
@@ -135,6 +147,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     chartData,
     range,
     shop,
+    isPaid,
+    rangeClamped,
     hasFeeConfig: !!settings,
     alertThreshold,
     alertProductCount: alertProducts.length,
@@ -151,12 +165,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
   const shop = session.shop;
   const formData = await request.formData();
   const intent = formData.get("intent");
 
   if (intent === "aiAnalysis") {
+    // Pro only: each generation is a real Anthropic call, cache or not.
+    if (!(await checkSubscription(admin))) {
+      return json(
+        {
+          analysis: "",
+          cached: false,
+          error: "AI recommendations require the Pro plan.",
+        },
+        { status: 403 },
+      );
+    }
     const range = (formData.get("range") as string) || "30d";
     const result = await getOrGenerateAiAnalysis(shop, range);
     return json(result);
@@ -296,6 +321,7 @@ function formatTimeAgo(isoString: string): string {
 export default function Dashboard() {
   const data = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [mounted, setMounted] = useState(false);
   const aiFetcher = useFetcher<{
     analysis?: string;
@@ -340,6 +366,8 @@ export default function Dashboard() {
     topProducts,
     chartData,
     range,
+    isPaid,
+    rangeClamped,
     hasFeeConfig,
     alertThreshold,
     alertProductCount,
@@ -444,8 +472,17 @@ export default function Dashboard() {
 
   return (
     <Page>
-      <TitleBar title="COGS Margin Tracker" />
+      <TitleBar title="Profit Analytics" />
       <BlockStack gap="400">
+        {rangeClamped && (
+          <Banner
+            title={`The Free plan covers the last ${FREE_TIER.maxRangeDays} days`}
+            tone="info"
+            action={{ content: "See plans", url: "/app/billing" }}
+          >
+            <p>Upgrade to report over any date range.</p>
+          </Banner>
+        )}
         {/* Profit alert banner */}
         {alertThreshold !== null && alertProductCount > 0 && (
           <Banner title="Low margin alert" tone="warning">
@@ -475,9 +512,11 @@ export default function Dashboard() {
             </Button>
             <Button
               pressed={range === "90d"}
-              onClick={() => handleRangeChange("90d")}
+              onClick={() =>
+                isPaid ? handleRangeChange("90d") : navigate("/app/billing")
+              }
             >
-              90 days
+              {isPaid ? "90 days" : "90 days (Pro)"}
             </Button>
           </ButtonGroup>
         </InlineStack>
