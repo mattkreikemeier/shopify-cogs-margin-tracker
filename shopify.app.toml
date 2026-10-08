@@ -48,4 +48,8 @@ scopes = "read_inventory,read_orders,read_products,write_inventory,write_product
 redirect_urls = [ "https://cogs.leverageapps.co/auth/callback" ]
 
 [build]
-automatically_update_urls_on_dev = true
+# Never let `shopify app dev` rewrite the production app URL to its tunnel.
+# On 2026-10-08 a dev session left the live app pointing at a dead
+# trycloudflare.com host, so every merchant got a broken iframe. Dev
+# sessions must use their own app, never this one.
+automatically_update_urls_on_dev = false
