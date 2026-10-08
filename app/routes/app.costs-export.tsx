@@ -1,9 +1,14 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
+import { requirePro } from "../services/billing.server";
 import db from "../db.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
+  // The Import Costs page is Pro-only, but these are resource routes a
+  // free shop could hit by URL. Gate them too so the listing's "bulk CSV
+  // import/export" promise holds at the endpoint, not just the page.
+  await requirePro(admin, "import");
   const shop = session.shop;
 
   const products = await db.productCost.findMany({
