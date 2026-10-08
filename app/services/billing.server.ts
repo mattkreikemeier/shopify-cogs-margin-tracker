@@ -41,12 +41,18 @@ export async function checkSubscription(admin: any): Promise<boolean> {
   return (await getActiveSubscription(admin)) !== null;
 }
 
-// BILLING_TEST_SHOPS is a comma-separated list of shop domains that get
-// test charges (dev stores have no payment method on file, so they cannot
-// approve real charges). BILLING_TEST=1 still forces test charges for
-// every shop, but avoid it now that real merchants are installed.
+// BILLING_TEST_SHOPS is a comma-separated list of shop domains that get test
+// charges, because dev stores have no payment method on file and so cannot
+// approve a real charge.
+//
+// There is deliberately NO global "make everything a test charge" switch. The
+// old BILLING_TEST=1 env var was exactly that, and on 2026-10-07 it was found
+// still set in production — every charge for roughly two months was a test
+// charge, so the app could not collect money and nothing surfaced it.
+//
+// Scoping the override to named shops makes forgetting to remove it harmless:
+// a stale entry only ever affects that one dev store, never a real merchant.
 function isTestShop(shop: string): boolean {
-  if (process.env.BILLING_TEST === "1") return true;
   return (process.env.BILLING_TEST_SHOPS || "")
     .split(",")
     .map((s) => s.trim())
