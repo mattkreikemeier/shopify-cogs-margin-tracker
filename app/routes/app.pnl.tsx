@@ -22,7 +22,7 @@ import db from "../db.server";
 import {
   getDashboardMetrics,
   getShopSettings,
-} from "../services/margin-calculator.server";
+ getFeeConfig, } from "../services/margin-calculator.server";
 import { getExpenseSummary } from "../services/expense-calculator.server";
 import { checkSubscription } from "../services/billing.server";
 import { FREE_TIER, allowedRange } from "../lib/plans";
@@ -70,12 +70,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   startDate.setDate(endDate.getDate() - periodDays);
 
   const settings = await getShopSettings(shop);
-  const feeConfig = settings
-    ? {
-        rate: Number(settings.paymentFeeRate),
-        flat: Number(settings.paymentFeeFlat),
-      }
-    : undefined;
+  const feeConfig = await getFeeConfig(shop);
 
   const metrics = await getDashboardMetrics(
     shop,

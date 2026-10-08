@@ -5,7 +5,7 @@ import {
   getTopProducts,
   getSnapshotData,
   getShopSettings,
-} from "./margin-calculator.server";
+ getFeeConfig, } from "./margin-calculator.server";
 import { getDiscountAnalysis } from "./discount-analytics.server";
 import { getExpenseSummary } from "./expense-calculator.server";
 
@@ -105,12 +105,7 @@ async function aggregateShopData(
   startDate.setDate(endDate.getDate() - periodDays);
 
   const settings = await getShopSettings(shop);
-  const feeConfig = settings
-    ? {
-        rate: Number(settings.paymentFeeRate),
-        flat: Number(settings.paymentFeeFlat),
-      }
-    : undefined;
+  const feeConfig = await getFeeConfig(shop);
 
   const [metrics, topProducts, chartData, discountAnalysis, totalVariants, variantsWithCost] =
     await Promise.all([

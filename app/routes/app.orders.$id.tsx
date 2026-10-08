@@ -21,8 +21,7 @@ import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import {
   getDashboardMetrics,
-  getShopSettings,
-} from "../services/margin-calculator.server";
+  getShopSettings, getFeeConfig } from "../services/margin-calculator.server";
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -105,11 +104,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       : null;
 
   // Same per-order estimate the dashboard uses: rate on revenue plus a flat fee
-  const fees = settings
-    ? (revenue * Number(settings.paymentFeeRate)) / 100 +
-      Number(settings.paymentFeeFlat)
-    : null;
-  const netProfit = fees !== null ? grossProfit - fees : null;
+  const feeConfig = await getFeeConfig(shop);
+  const fees = (revenue * feeConfig.rate) / 100 + feeConfig.flat;
+  const netProfit = grossProfit - fees;
 
   // "vs. your store" context: revenue-weighted margin over the store's last
   // 30 days, same math as the dashboard's average margin

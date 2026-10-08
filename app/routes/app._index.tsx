@@ -39,7 +39,7 @@ import {
   getSnapshotData,
   getShopSettings,
   getAlertProducts,
-} from "../services/margin-calculator.server";
+ getFeeConfig, } from "../services/margin-calculator.server";
 import { getExpenseSummary } from "../services/expense-calculator.server";
 import { getDiscountAnalysis } from "../services/discount-analytics.server";
 import { generateInsights } from "../services/insights-engine.server";
@@ -90,12 +90,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   else startDate.setDate(endDate.getDate() - 30);
 
   const settings = await getShopSettings(shop);
-  const feeConfig = settings
-    ? {
-        rate: Number(settings.paymentFeeRate),
-        flat: Number(settings.paymentFeeFlat),
-      }
-    : undefined;
+  const feeConfig = await getFeeConfig(shop);
 
   const [metrics, topProducts, chartData, discountAnalysis, variantsWithCost] =
     await Promise.all([
@@ -155,7 +150,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     shop,
     isPaid,
     rangeClamped,
-    hasFeeConfig: !!settings,
+    // Fees are always applied now; this only decides whether to say so.
+    feesAreDefault: !settings,
     alertThreshold,
     alertProductCount: alertProducts.length,
     expenseData: expenseData || null,
@@ -421,7 +417,7 @@ export default function Dashboard() {
     range,
     isPaid,
     rangeClamped,
-    hasFeeConfig,
+    feesAreDefault,
     alertThreshold,
     alertProductCount,
     expenseData,
@@ -580,9 +576,9 @@ export default function Dashboard() {
             subtitle={
               metrics.totalTransactionFees > 0
                 ? `${metrics.netMarginPct.toFixed(1)}% after ${formatMoney(metrics.totalTransactionFees)} in fees`
-                : hasFeeConfig
-                  ? `${metrics.netMarginPct.toFixed(1)}% margin`
-                  : "Configure fees in Setup"
+                : feesAreDefault
+                  ? "After 2.9% + $0.30 fees · adjust in Setup"
+                  : `${metrics.netMarginPct.toFixed(1)}% margin`
             }
           />
         </InlineGrid>

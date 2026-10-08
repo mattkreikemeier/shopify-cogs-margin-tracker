@@ -32,6 +32,23 @@ export async function getShopSettings(shop: string) {
   return db.shopSettings.findUnique({ where: { shop } });
 }
 
+// Shopify Payments' standard online rate. The ShopSettings columns default to
+// these too, but a shop has no row at all until it saves the Setup form — and
+// the form *displays* these values as if active. Treating "no row" as "no fees"
+// made net profit equal gross profit on every fresh install. Unsaved means
+// defaults, everywhere, so the numbers match what the form shows.
+export const DEFAULT_FEE_CONFIG: FeeConfig = { rate: 2.9, flat: 0.3 };
+
+/** Fee config for calculations: the merchant's saved rates, else the defaults. */
+export async function getFeeConfig(shop: string): Promise<FeeConfig> {
+  const settings = await getShopSettings(shop);
+  if (!settings) return DEFAULT_FEE_CONFIG;
+  return {
+    rate: Number(settings.paymentFeeRate),
+    flat: Number(settings.paymentFeeFlat),
+  };
+}
+
 export async function getDashboardMetrics(
   shop: string,
   startDate: Date,
