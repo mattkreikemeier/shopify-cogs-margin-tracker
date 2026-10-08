@@ -23,7 +23,7 @@ export default function Index() {
     <div className={styles.index}>
       <div className={styles.content}>
         <h1 className={styles.heading}>
-          COGS Margin Tracker <span className={styles.accent}>by LEVERAGE</span>
+          Profit Analytics <span className={styles.accent}>by Leverage</span>
         </h1>
         <p className={styles.text}>
           See your real profit margins on every product and order.

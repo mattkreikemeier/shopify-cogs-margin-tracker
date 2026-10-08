@@ -4,6 +4,7 @@ import {
   useLoaderData,
   useSearchParams,
   useNavigate,
+  useRevalidator,
   Link,
   useFetcher,
 } from "@remix-run/react";
@@ -30,6 +31,7 @@ import { useState, useEffect } from "react";
 import { authenticate } from "../shopify.server";
 import { checkSubscription } from "../services/billing.server";
 import { allowedRange, FREE_TIER } from "../lib/plans";
+import { ensureInitialSync } from "../services/auto-sync.server";
 import db from "../db.server";
 import {
   getDashboardMetrics,
@@ -64,11 +66,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const range = allowedRange(requestedRange, isPaid);
   const rangeClamped = range !== requestedRange;
 
-  const productCount = await db.productCost.count({ where: { shop } });
-
-  if (productCount === 0) {
+  // First visit: kick off the initial product + order sync in the background
+  // and show progress, instead of an empty dashboard and a Setup scavenger hunt.
+  const syncState = await ensureInitialSync(admin, shop);
+  if (syncState !== "ready") {
     return json({
       hasData: false as const,
+      syncState,
       productCount: 0,
       range,
       shop,
@@ -76,6 +80,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       rangeClamped,
     });
   }
+
+  const productCount = await db.productCost.count({ where: { shop } });
 
   const endDate = new Date();
   const startDate = new Date();
@@ -318,6 +324,19 @@ function formatTimeAgo(isoString: string): string {
   return days === 1 ? "1 day ago" : `${days} days ago`;
 }
 
+// Re-runs the loader every few seconds while the initial sync is in flight,
+// so the dashboard swaps in by itself instead of asking the merchant to refresh.
+function SyncPoller() {
+  const revalidator = useRevalidator();
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (revalidator.state === "idle") revalidator.revalidate();
+    }, 3000);
+    return () => clearInterval(id);
+  }, [revalidator]);
+  return null;
+}
+
 export default function Dashboard() {
   const data = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -338,23 +357,36 @@ export default function Dashboard() {
   };
 
   if (!data.hasData) {
+    const syncing = data.syncState === "syncing";
     return (
       <Page>
-        <TitleBar title="COGS Margin Tracker" />
+        <TitleBar title="Profit Analytics" />
+        {syncing && <SyncPoller />}
         <Layout>
           <Layout.Section>
-            <Card>
-              <EmptyState
-                heading="Welcome to COGS Margin Tracker"
-                image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
-                action={{ content: "Get started", url: "/app/setup" }}
-              >
+            {syncing ? (
+              <Banner title="Setting up your profit data" tone="info">
                 <p>
-                  Sync your product costs from Shopify to start tracking profit
-                  margins across your store.
+                  Pulling your products, costs and the last 90 days of orders
+                  from Shopify. This usually takes well under a minute, and the
+                  dashboard will appear on its own when it's done.
                 </p>
-              </EmptyState>
-            </Card>
+              </Banner>
+            ) : (
+              <Card>
+                <EmptyState
+                  heading="No products found yet"
+                  image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                  action={{ content: "Run sync manually", url: "/app/setup" }}
+                >
+                  <p>
+                    We looked for products in your store and didn't find any.
+                    Add products in Shopify, or run the sync again from Setup
+                    once they're in.
+                  </p>
+                </EmptyState>
+              </Card>
+            )}
           </Layout.Section>
         </Layout>
       </Page>

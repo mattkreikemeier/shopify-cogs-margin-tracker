@@ -26,6 +26,7 @@ import {
 import { getExpenseSummary } from "../services/expense-calculator.server";
 import { checkSubscription } from "../services/billing.server";
 import { FREE_TIER, allowedRange } from "../lib/plans";
+import { ensureInitialSync } from "../services/auto-sync.server";
 
 function money(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -53,8 +54,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const range = allowedRange(requested, isPaid);
   const clamped = range !== requested;
 
-  const productCount = await db.productCost.count({ where: { shop } });
-  if (productCount === 0) {
+  const syncState = await ensureInitialSync(admin, shop);
+  if (syncState !== "ready") {
     return json({
       hasData: false as const,
       isPaid,
