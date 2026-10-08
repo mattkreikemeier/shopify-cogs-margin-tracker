@@ -356,6 +356,27 @@ export default function Dashboard() {
     setSearchParams(params);
   };
 
+  // Every hook must run on every render. These used to sit below the no-data
+  // early return; when the sync poller flipped the loader from "syncing" to
+  // "ready" in place, the data render called more hooks than the previous one
+  // (React #310). Hoisted above the branch; the one data-dependent input is
+  // read defensively so the no-data render sees the same hook sequence.
+  const toggleFetcher = useFetcher();
+  const loaderCompletedItems = data.hasData ? data.aiCompletedItems : undefined;
+  const [completedItems, setCompletedItems] = useState<number[]>(
+    loaderCompletedItems || [],
+  );
+  // Reset completed items when new analysis is generated
+  useEffect(() => {
+    if (aiFetcher.data?.analysis) {
+      setCompletedItems([]);
+    }
+  }, [aiFetcher.data?.analysis]);
+  // Sync from loader on navigation
+  useEffect(() => {
+    setCompletedItems(loaderCompletedItems || []);
+  }, [loaderCompletedItems]);
+
   if (!data.hasData) {
     const syncing = data.syncState === "syncing";
     return (
@@ -409,32 +430,12 @@ export default function Dashboard() {
     aiAnalysis,
     aiCachedAt,
     aiCanRefresh,
-    aiCompletedItems,
   } = data;
-
-  const toggleFetcher = useFetcher();
 
   // Use fetcher result if available, fall back to loader data
   const currentAiAnalysis = aiFetcher.data?.analysis || aiAnalysis;
   const aiError = aiFetcher.data?.error;
   const isLoadingAi = aiFetcher.state !== "idle";
-
-  // Track completed items — merge toggle responses with loader data
-  const [completedItems, setCompletedItems] = useState<number[]>(
-    aiCompletedItems || [],
-  );
-
-  // Reset completed items when new analysis is generated
-  useEffect(() => {
-    if (aiFetcher.data?.analysis) {
-      setCompletedItems([]);
-    }
-  }, [aiFetcher.data?.analysis]);
-
-  // Sync from loader on navigation
-  useEffect(() => {
-    setCompletedItems(aiCompletedItems || []);
-  }, [aiCompletedItems]);
 
   const toggleItem = (index: number) => {
     const updated = completedItems.includes(index)
